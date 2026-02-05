@@ -1,0 +1,7 @@
+flask
+groq
+pandas
+openpyxl
+python-docx
+pymupdf
+pillow
