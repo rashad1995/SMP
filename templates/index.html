@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>Strategic Analysis Platform 2026</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #0f172a; --panel: #1e293b; --primary: #3b82f6; --accent: #f43f5e; --white: #ffffff; }
+        body { font-family: 'Cairo', sans-serif; background: var(--bg); color: var(--white); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Dashboard Right */
+        .sidebar-right { width: 320px; background: var(--panel); padding: 25px; border-left: 1px solid #334155; display: flex; flex-direction: column; }
+        .control-box { background: #0f172a; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #334155; }
+        
+        /* Main Area */
+        .main-view { flex: 1; background: #f8fafc; padding: 40px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+        .paper { background: white; width: 100%; max-width: 900px; padding: 50px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); color: #1e293b; border-top: 15px solid var(--primary); }
+        
+        /* Chat Left */
+        .chat-sidebar-left { position: fixed; top: 0; left: -400px; width: 400px; height: 100%; background: white; transition: 0.4s; z-index: 1000; box-shadow: 10px 0 30px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+        .chat-sidebar-left.open { left: 0; }
+        .chat-header { background: var(--primary); padding: 20px; color: white; font-weight: bold; display: flex; justify-content: space-between; }
+        #chat-msgs { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px 15px; border-radius: 10px; max-width: 80%; font-size: 14px; }
+        .bot { background: #dbeafe; align-self: flex-start; }
+        .user { background: #f1f5f9; align-self: flex-end; }
+
+        /* Titles & UI */
+        .title-red { color: var(--accent); font-size: 28px; font-weight: 900; text-align: center; display: block; margin-bottom: 20px; text-decoration: underline; }
+        .header-blue { color: var(--primary); font-size: 20px; font-weight: 700; border-right: 5px solid var(--primary); padding-right: 10px; margin-top: 30px; display: block; }
+        button { cursor: pointer; border: none; border-radius: 8px; padding: 12px; font-weight: bold; font-family: 'Cairo'; width: 100%; margin-top: 10px; transition: 0.3s; }
+        .btn-main { background: var(--primary); color: white; }
+        .btn-pdf { background: var(--accent); color: white; }
+        .bot-trigger { background: var(--primary); padding: 15px; border-radius: 10px; text-align: center; margin-top: auto; cursor: pointer; font-weight: 900; }
+    </style>
+</head>
+<body>
+
+    <div class="chat-sidebar-left" id="chatBar">
+        <div class="chat-header"><span>المساعد الذكي 🤖</span> <span onclick="toggleChat()" style="cursor:pointer">✕</span></div>
+        <div id="chat-msgs"><div class="msg bot">أهلاً بك! أنا هنا لتحليل التقرير معك.</div></div>
+        <div style="padding:15px; border-top:1px solid #eee; display:flex; gap:5px;">
+            <input type="text" id="chatIn" placeholder="اسأل عن التقرير..." style="flex:1; padding:10px; border-radius:5px; border:1px solid #ddd;">
+            <button onclick="askBot()" style="width:auto; margin:0; background:var(--primary); color:white;">➔</button>
+        </div>
+    </div>
+
+    <div class="main-view">
+        <div id="loader" style="display:none; color:var(--bg); margin-bottom:10px;">⚡ جاري التحليل الاستراتيجي...</div>
+        <div class="paper" id="paperArea">
+            <div id="output" style="direction: rtl; text-align: right;">
+                <h2 style="text-align:center; color:#94a3b8; margin-top:100px;">بانتظار رفع الملف للبدء...</h2>
+            </div>
+            <canvas id="chartCanvas" style="margin-top:30px;"></canvas>
+        </div>
+    </div>
+
+    <div class="sidebar-right">
+        <h2 style="text-align:center; color:var(--primary);">DASHBOARD</h2>
+        <div class="control-box">
+            <label style="color:#94a3b8; font-size:12px;">تحميل الملف (CSV, PDF, DOCX, IMG)</label>
+            <input type="file" id="fileIn" style="width:100%; margin-top:10px; color:white;">
+        </div>
+        <div class="control-box">
+            <select id="lang" style="width:100%; padding:10px; border-radius:5px; background:var(--bg); color:white; border:none;">
+                <option value="Arabic">العربية</option>
+                <option value="English">English</option>
+            </select>
+        </div>
+        <button onclick="generateReport()" class="btn-main">توليد التقرير 🚀</button>
+        <button onclick="exportPDF()" class="btn-pdf">تصدير PDF 📄</button>
+        
+        <div class="bot-trigger" onclick="toggleChat()">🤖 استشارة المساعد الذكي</div>
+    </div>
+
+    <script>
+        let chartInstance = null;
+        function toggleChat() { document.getElementById('chatBar').classList.toggle('open'); }
+
+        async function generateReport() {
+            const file = document.getElementById('fileIn').files[0];
+            if(!file) return alert("اختر ملفاً أولاً!");
+            
+            document.getElementById('loader').style.display = 'block';
+            let fd = new FormData(); fd.append('file', file); fd.append('lang', document.getElementById('lang').value);
+
+            let res = await fetch('/analyze', { method: 'POST', body: fd });
+            let data = await res.json();
+            
+            document.getElementById('loader').style.display = 'none';
+            renderReport(data.report);
+            if(data.chart) drawChart(data.chart);
+        }
+
+        function renderReport(text) {
+            const out = document.getElementById('output');
+            let html = text.replace(/\[RED_TITLE\](.*?)\[\/RED_TITLE\]/g, '<span class="title-red">$1</span>')
+                           .replace(/\[BLUE_HEADER\](.*?)\[\/BLUE_HEADER\]/g, '<span class="header-blue">$1</span>');
+            out.innerHTML = html.split('\n').map(l => l.trim() ? `<p>${l}</p>` : '').join('');
+        }
+
+        function drawChart(data) {
+            const ctx = document.getElementById('chartCanvas').getContext('2d');
+            if(chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{ label: `توزيع بيانات: ${data.column}`, data: data.values, backgroundColor: '#3b82f6' }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        async function askBot() {
+            let q = document.getElementById('chatIn').value; if(!q) return;
+            document.getElementById('chat-msgs').innerHTML += `<div class="msg user">${q}</div>`;
+            document.getElementById('chatIn').value = '';
+
+            let res = await fetch('/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query:q}) });
+            let data = await res.json();
+            document.getElementById('chat-msgs').innerHTML += `<div class="msg bot">${data.answer}</div>`;
+        }
+
+        function exportPDF() { html2pdf().from(document.getElementById('paperArea')).save('Strategic_Report.pdf'); }
+    </script>
+</body>
+</html>
